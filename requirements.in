@@ -1,0 +1,3 @@
+# requirements.in
+docopt   # option parsing via docstring
+logzero  # logging made easy # github.com/metachris/logzero
