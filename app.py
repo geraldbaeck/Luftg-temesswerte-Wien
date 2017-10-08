@@ -48,14 +48,43 @@ json.JSONEncoder.default = lambda self,obj: (obj.isoformat() if isinstance(obj, 
 
 #Global configurations
 DATA_URL = "https://www.wien.gv.at/ma22-lgb/umweltgut/lumesakt-v2.csv"
+S3_BUCKET = "luftguetemesswerte"
 
-def downloadCSV(etag='"20144-13d2-55adbd9be0540"'):
+def store_last_etag(etag):
+    client = boto3.client('s3')
+    client.put_object(
+        ACL="private",
+        Body=etag,
+        Bucket=S3_BUCKET,
+        CacheControl="no-cache, no-store, must-revalidate",
+        ContentType="text/plain",
+        Expires=datetime.now() + timedelta(hours=1),
+        Key="etag",
+        ServerSideEncryption="AES256",
+        StorageClass="REDUCED_REDUNDANCY",
+    )
+
+
+def get_last_etag():
+    client = boto3.client('s3')
+    try:
+        obj = client.get_object(Bucket=S3_BUCKET, Key="etag")
+        etag = obj['Body'].read()
+    except client.exceptions.NoSuchKey:
+        etag = "NoSuchKey"
+    return etag
+
+
+def downloadCSV(etag=None):
+    if not etag:
+        etag = get_last_etag()
     content = False
     headers = {'If-None-Match': etag}
     r = requests.get(DATA_URL, headers=headers)
 
     if r.status_code == 200:
         content = r.content.decode('ISO-8859-1')
+        store_last_etag(r.headers["ETag"])
     elif r.status_code == 304:
         # do nothing because file has alredy been loaded
         app.log.debug("CSV has already been loaded (ETag match).")
@@ -72,13 +101,13 @@ def save_datapoint(datapoint):
 
 
 def store_to_S3(content, file_name, time, content_type):
-    file_tmplt = "{time:%Y}/{time:%m}/{time:%d}/{time:%Y%m%d%H%M}_{file_name}"
+    file_tmplt = "{time:%Y}/{time:%m}/{time:%d}/{time:%Y%m%d%H%M}{file_name}"
     file_key = file_tmplt.format(time=time, file_name=file_name)
     client = boto3.client('s3')
     client.put_object(
         ACL="public-read",
         Body=content,
-        Bucket="luftguetemesswerte",
+        Bucket=S3_BUCKET,
         CacheControl="public, max-age=31536000, immutable",
         ContentType=content_type,
         Expires=datetime(2099, 9, 9),
@@ -86,6 +115,8 @@ def store_to_S3(content, file_name, time, content_type):
         ServerSideEncryption="AES256",
         StorageClass="REDUCED_REDUNDANCY",
     )
+    app.log.debug("{} saved to S3:{}".format(file_key, S3_BUCKET))
+
 
 # converts string to datetime
 # fixes error with 24:00 time instead of 0:00
@@ -102,7 +133,6 @@ def get_date(date_string):
 @app.route('/')
 def index():
     """ Main entry point of the app """
-    # download the csv file
     csv_content = downloadCSV()
 
     if csv_content:
@@ -153,5 +183,5 @@ def index():
                         datapoint['unit'] = units[i+1]
 
         # save the csv file to  S3
-        store_to_S3(csv_content, "original.csv", data_time, "text/csv")
+        store_to_S3(csv_content, "_original.csv", data_time, "text/csv")
         store_to_S3(json.dumps(datapoints), ".json", data_time, "application/json")
