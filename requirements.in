@@ -1,3 +1,4 @@
 # requirements.in
-docopt   # option parsing via docstring
-logzero  # logging made easy # github.com/metachris/logzero
+boto3     # AWS Library               # https://boto3.readthedocs.io/en/latest/
+chalice   # AWS Lamda framework       # https://chalice.readthedocs.io/en/latest/
+requests  # http requests for humans  # http://docs.python-requests.org/en/master/

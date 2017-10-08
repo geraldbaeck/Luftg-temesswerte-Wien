@@ -119,3 +119,7 @@ DerivedData
 *.ipa
 *.xcuserstate
 project.xcworkspace
+
+# chalice
+.chalice/deployments/
+.chalice/venv/
