@@ -7,7 +7,11 @@
 behave==1.2.5
 click==6.7                # via pip-tools
 first==2.0.1              # via pip-tools
+isort==4.2.15
+jedi==0.11.0
 parse-type==0.4.2         # via behave
 parse==1.8.2              # via behave, parse-type
+parso==0.1.0              # via jedi
 pip-tools==1.10.1
 six==1.11.0               # via behave, parse-type, pip-tools
+yapf==0.18.0
