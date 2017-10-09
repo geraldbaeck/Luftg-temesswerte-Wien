@@ -1,9 +1,16 @@
 {
   "version": "2.0",
-  "app_name": "chalice",
+  "app_name": "Vienna Air Pollution Scraper",
   "stages": {
     "dev": {
-      "api_gateway_stage": "api"
+      "autogen_policy": false,
+      "api_gateway_stage": "dev"
+    },
+    "beta": {
+      "autogen_policy": true
+    },
+    "prod": {
+      "manage_iam_role": true
     }
   }
 }
