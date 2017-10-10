@@ -20,7 +20,8 @@ import requests
 
 # 3rd party libraries
 import boto3  # https://boto3.readthedocs.io/en/latest/index.html
-from chalice import Chalice
+from chalice import Chalice  # https://chalice.readthedocs.io/en/latest/
+from chalice import Rate, Response
 
 # Own libraries
 
@@ -35,6 +36,42 @@ json.JSONEncoder.default = lambda self, o: (o.isoformat() if isinstance(o, datet
 # Global configurations
 DATA_URL = "https://www.wien.gv.at/ma22-lgb/umweltgut/lumesakt-v2.csv"
 S3_BUCKET = "luftguetemesswerte"
+GITHUB_URL = "https://github.com/geraldbaeck/Luftg-temesswerte-Wien"
+
+
+def dict_to_item(raw):
+    if type(raw) is dict:
+        resp = {}
+        for k, v in raw.items():
+            if type(v) is str:
+                resp[k] = {
+                    'S': v
+                }
+            elif type(v) is int:
+                resp[k] = {
+                    'I': str(v)
+                }
+            elif type(v) is dict:
+                resp[k] = {
+                    'M': dict_to_item(v)
+                }
+            elif type(v) is list:
+                resp[k] = []
+                for i in v:
+                    resp[k].append(dict_to_item(i))
+            elif type(v) is datetime:
+                resp[k] = {
+                    'S':  v.isoformat()
+                }
+        return resp
+    elif type(raw) is str:
+        return {
+            'S': raw
+        }
+    elif type(raw) is int:
+        return {
+            'I': str(raw)
+        }
 
 
 def store_last_etag(etag):
@@ -80,11 +117,14 @@ def downloadCSV(etag=None):
     return content
 
 
-# TODO save datapoint to dynamoDB
 def save_datapoint(datapoint):
     id_template = "{time:%Y%m%d%H%M}_{station}_{name}_{type}"
     datapoint['_id'] = id_template.format(**datapoint)
-    return True
+    client = boto3.client('dynamodb')
+    client.put_item(
+        Item=dict_to_item(datapoint),
+        TableName=S3_BUCKET,
+    )
 
 
 def store_to_S3(content, file_name, time, content_type):
@@ -151,6 +191,16 @@ def process_csv_data(content, header, types, units):
 
 @app.route('/')
 def index():
+    return Response(
+        body='<html><body><a href="{0}">{0}</a></body></html>'.format(
+            GITHUB_URL),
+        status_code=302,
+        headers={'Content-Type': 'text/html',
+                 'Location': GITHUB_URL})
+
+
+@app.schedule(Rate(14, unit=Rate.MINUTES))
+def download(event):
     """ Main entry point of the app """
     csv_content = downloadCSV()
 
